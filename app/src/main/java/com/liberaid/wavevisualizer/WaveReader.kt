@@ -165,7 +165,38 @@ class WaveReader {
 
         } while(currentBytes != needBytes && currentReadBytes != 0)
 
-        return currentBytes
+        return currentBytes / 2
+    }
+
+    fun readRaw32bit(buffer: IntArray): Int {
+        if(bitsPerSample != 32.toShort())
+            throw WrongDepthReading(32, bitsPerSample)
+
+        val needBytes = buffer.size * 4
+        var currentBytes = 0
+        var currentReadBytes = 0
+        var currentPos = 0
+
+        do {
+            val toRead = Math.min(needBytes - currentBytes, rawCharBuff.size)
+            currentReadBytes = readRaw(rawCharBuff, toRead)
+            currentBytes += currentReadBytes
+
+            for(i in 0 until currentReadBytes){
+                if(i % 4 == 3)
+                    continue
+
+                val curr = rawCharBuff[i].toInt()
+                val prev1 = rawCharBuff[i - 1].toInt()
+                val prev2 = rawCharBuff[i - 2].toInt()
+                val prev3 = rawCharBuff[i - 3].toInt()
+
+                buffer[currentPos++] = (curr shl 24) and (prev1 shl 16) and (prev2 shl 8) and prev3
+            }
+
+        } while(currentBytes != needBytes && currentReadBytes != 0)
+
+        return currentBytes / 4
     }
 
     fun readRaw(buffer: CharArray, length: Int): Int {
