@@ -150,7 +150,5 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         const val DEFAULT_DELIMITER_COLOR = Color.DKGRAY
         const val DEFAULT_BARS_COLOR = Color.GRAY
         val DEFAULT_BG_COLOR = Color.parseColor("#77ed4c")
-
-        const val MIN_HEIGHT = 300
     }
 }

@@ -17,9 +17,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         btnStart.setOnClickListener {
-                waveVisualizer.loadWaveFromAssets("example.wav")
-                    Toast.makeText(this@MainActivity, "Loaded", Toast.LENGTH_SHORT).show()
-                    waveVisualizer.invalidate()
+            waveVisualizer.loadWaveFromAssets("example.wav")
+            Toast.makeText(this@MainActivity, "Loaded", Toast.LENGTH_SHORT).show()
+            waveVisualizer.invalidate()
         }
     }
 }

@@ -142,7 +142,7 @@ class WaveReader {
     }
 
     /**
-     * Calculates average value in each channel by all [samples]
+     * Calculates average value for each channel by all [samples]
      *
      * @param samples - number of samples to read
      * @return average values for each channel
