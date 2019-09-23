@@ -7,8 +7,14 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import kotlin.math.abs
+import kotlin.math.min
 
+@ExperimentalUnsignedTypes
 class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attrs) {
+
+    private val waveReader = WaveReader()
+    private val amplitudes = mutableListOf<Int>()
 
     private val borderRect = RectF()
     private val paint = Paint()
@@ -56,24 +62,52 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         paint.color = delimiterColor
         canvas.drawLine(borderRect.left, borderRect.height() / 2f, borderRect.right, borderRect.height() / 2f, paint)
 
-        val barsNumber = (borderRect.width() / (barWidth + barsOffset)).toInt()
         paint.apply {
             style = Paint.Style.FILL
             color = barsColor
         }
 
         var x = barsOffset / 2f
-        val y = 8f
-        val height = borderRect.height() - y
+        var y: Float
+        var h: Float
+        val maxAmp = amplitudes.max()?.toFloat() ?: 255f
+        var frac: Float
 
-        for(i in 0 until barsNumber){
-            barRect.set(x, y, x + barWidth, height)
+        amplitudes.forEach{
+            frac = it / maxAmp
+            y = borderRect.height() / 2 - frac * borderRect.height()
+            h = borderRect.height() / 2 + frac * borderRect.height()
+
+            barRect.set(x, y, x + barWidth, h)
             canvas.drawRect(barRect, paint)
 
             x += barWidth + barsOffset
         }
     }
 
+    fun loadWaveFromAssets(filename: String): Boolean {
+        waveReader.readWaveHeaderFromAssets(context, filename)
+
+        if(!waveReader.isHeaderRead || !waveReader.isHeaderValid() || !waveReader.isPCMFormat())
+            return false
+
+        amplitudes.clear()
+
+        /* Hardcoded for 2 channels */
+        val barsNumber = (borderRect.width() / (barWidth + barsOffset)).toInt()
+        val samplesPerBar = waveReader.waveSamples / barsNumber
+        var readSamples = (waveReader.bytesRead - WaveReader.HEADER_SIZE) / ( waveReader.bitsPerSample / 8 )
+
+        while(readSamples < waveReader.waveSamples){
+            val toRead = min(samplesPerBar, waveReader.waveSamples - readSamples)
+            val average = waveReader.read16Average(toRead)[0]
+            amplitudes.add(abs(average.toInt()))
+
+            readSamples = (waveReader.bytesRead - WaveReader.HEADER_SIZE) / ( waveReader.bitsPerSample / 8 )
+        }
+
+        return true
+    }
 
     var borderColor: Int = 0
     set(value) {

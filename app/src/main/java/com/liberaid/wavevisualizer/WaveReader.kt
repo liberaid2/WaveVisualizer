@@ -22,8 +22,11 @@ class WaveReader {
     private var bytesBuff: ByteArray? = null
     private val rawBytesBuff = ByteArray(32 * 100) { 0 }
 
-    private var isHeaderRead = false
-    private var bytesRead = 0
+    var bytesRead = 0; private set
+    var isHeaderRead = false; private set
+
+    val waveSamples: Int
+        get() = subchunk2Size / (bitsPerSample / 8)
 
     fun readWaveHeaderFromAssets(context: Context, filename: String) {
         close()
@@ -50,7 +53,7 @@ class WaveReader {
         subchunk2Id = Utils.bytesToIntLittleEndian(bytes, 36)
         subchunk2Size = Utils.bytesToIntLittleEndian(bytes, 40)
 
-        bytesRead = 44
+        bytesRead = HEADER_SIZE
 
         return true
     }
@@ -135,6 +138,33 @@ class WaveReader {
         return toRead
     }
 
+    fun read16Average(length: Int): DoubleArray {
+        val bytes = bytesBuff ?: throw unreadWaveHeaderException
+        val leftBytes = subchunk2Size - bytesRead + HEADER_SIZE
+        val bytesLength = length * 2
+        if(bytesLength > leftBytes)
+            throw IndexOutOfBoundsException("Requested length ($bytesLength) is greater than left bytes ($leftBytes)")
+
+        val channels = numChannels.toInt()
+        val result = Array(channels) { .0 }
+
+        var currentBytes = 0
+        var currentChannel = 0
+        while(currentBytes < bytesLength) {
+
+            val amp = Utils.bytesToShortLittleEndian(bytes, bytesRead + currentBytes)
+            result[currentChannel] = result[currentChannel] + amp
+
+            currentChannel++
+            currentChannel %= channels
+            currentBytes += 2
+        }
+
+        bytesRead += bytesLength
+
+        return DoubleArray(channels) { result[it] / bytesLength }
+    }
+
     fun close() {
         isHeaderRead = false
         bytesBuff = null
@@ -147,8 +177,9 @@ class WaveReader {
         const val MAGIC_FMT = 0x20746D66
         const val MAGIC_DATA = 0x61746164
 
-        val unreadWaveHeaderException = UnreadWaveHeaderException()
+        const val HEADER_SIZE = 44
 
+        val unreadWaveHeaderException = UnreadWaveHeaderException()
     }
 
     class UnreadWaveHeaderException : IllegalStateException("Unread wave header or an error occurred during reading")
