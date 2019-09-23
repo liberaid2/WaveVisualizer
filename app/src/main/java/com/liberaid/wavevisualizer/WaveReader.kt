@@ -65,6 +65,9 @@ class WaveReader {
         return chunkId == MAGIC_RIFF && format == MAGIC_WAVE && subchunk1Id == MAGIC_FMT && subchunk2Id == MAGIC_DATA
     }
 
+    /**
+     * PCM format - encoding without compression (linear)
+     * */
     fun isPCMFormat(): Boolean = subchunk1Size == 16 && audioFormat == 1.toShort()
 
     fun readRaw8bit(buffer: ByteArray): Int{
@@ -129,7 +132,7 @@ class WaveReader {
     fun readRaw(buffer: ByteArray, length: Int): Int {
         val bytes = bytesBuff ?: throw unreadWaveHeaderException
         if(length > buffer.size)
-            throw RuntimeException("Requested length ($length) is greater than buffer length (${buffer.size})")
+            throw IndexOutOfBoundsException("Requested length ($length) is greater than buffer length (${buffer.size})")
 
         var toRead = min(buffer.size, length)
         toRead = min(toRead, bytes.size - bytesRead)
@@ -138,31 +141,47 @@ class WaveReader {
         return toRead
     }
 
-    fun read16Average(length: Int): DoubleArray {
+    /**
+     * Calculates average value in each channel by all [samples]
+     *
+     * @param samples - number of samples to read
+     * @return average values for each channel
+     * */
+    fun readAverage(samples: Int): DoubleArray {
         val bytes = bytesBuff ?: throw unreadWaveHeaderException
         val leftBytes = subchunk2Size - bytesRead + HEADER_SIZE
-        val bytesLength = length * 2
+        val bytesLength = samples * bitsPerSample / 8
         if(bytesLength > leftBytes)
-            throw IndexOutOfBoundsException("Requested length ($bytesLength) is greater than left bytes ($leftBytes)")
+            throw LengthOutOfBoundsException(bytesLength, leftBytes)
 
         val channels = numChannels.toInt()
-        val result = Array(channels) { .0 }
+        val result = DoubleArray(channels)
 
         var currentBytes = 0
         var currentChannel = 0
         while(currentBytes < bytesLength) {
 
-            val amp = Utils.bytesToShortLittleEndian(bytes, bytesRead + currentBytes)
+            val offset = bytesRead + currentBytes
+            val amp = when(bitsPerSample / 8) {
+                1 -> bytes[offset].toInt()
+                2 -> Utils.bytesToShortLittleEndian(bytes, offset)
+                4 -> Utils.bytesToIntLittleEndian(bytes, offset)
+                else -> throw RuntimeException("Unexpected depth: bitsPerSample=$bitsPerSample")
+            }
             result[currentChannel] = result[currentChannel] + amp
 
             currentChannel++
             currentChannel %= channels
-            currentBytes += 2
+            currentBytes += bitsPerSample / 8
         }
 
         bytesRead += bytesLength
 
-        return DoubleArray(channels) { result[it] / bytesLength }
+        for(i in 0 until channels){
+            result[i] = result[i] / samples
+        }
+
+        return result
     }
 
     fun close() {
@@ -184,4 +203,5 @@ class WaveReader {
 
     class UnreadWaveHeaderException : IllegalStateException("Unread wave header or an error occurred during reading")
     class WrongDepthReading(tryDepth: Int, actualDepth: Short) : RuntimeException("Trying to read raw wave with wrong depth, attempt=$tryDepth, actual=$actualDepth")
+    class LengthOutOfBoundsException(requested: Int, left: Int) : IndexOutOfBoundsException("Requested length ($requested) is greater than left bytes ($left)")
 }

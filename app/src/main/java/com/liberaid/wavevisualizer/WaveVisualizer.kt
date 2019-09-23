@@ -100,7 +100,7 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
 
         while(readSamples < waveReader.waveSamples){
             val toRead = min(samplesPerBar, waveReader.waveSamples - readSamples)
-            val average = waveReader.read16Average(toRead)[0]
+            val average = waveReader.readAverage(toRead)[0]
             amplitudes.add(abs(average.toInt()))
 
             readSamples = (waveReader.bytesRead - WaveReader.HEADER_SIZE) / ( waveReader.bitsPerSample / 8 )
