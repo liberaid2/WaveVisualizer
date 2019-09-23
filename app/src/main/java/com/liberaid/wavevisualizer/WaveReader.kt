@@ -1,8 +1,7 @@
 package com.liberaid.wavevisualizer
 
 import android.content.Context
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import kotlin.math.min
 
 class WaveReader {
 
@@ -20,105 +19,38 @@ class WaveReader {
     var subchunk2Id = 0; private set
     var subchunk2Size = 0; private set
 
-    private val charBuff = CharArray(4)
-    private val rawCharBuff = CharArray(32 * 100)
+    private var bytesBuff: ByteArray? = null
+    private val rawBytesBuff = ByteArray(32 * 100) { 0 }
 
-    private var reader: BufferedReader? = null
     private var isHeaderRead = false
     private var bytesRead = 0
 
     fun readWaveHeaderFromAssets(context: Context, filename: String) {
-        val isr = InputStreamReader(context.assets.open(filename))
-        reader = BufferedReader(isr)
+        close()
+
+        bytesBuff = context.assets.open(filename).readBytes()
 
         isHeaderRead = readHeader()
     }
 
     private fun readHeader(): Boolean {
-        val reader = reader ?: return false
+        val bytes = bytesBuff ?: return false
 
-        /* chunkId */
-        if(reader.read(charBuff) != 4)
-            return false
+        chunkId = Utils.bytesToIntLittleEndian(bytes, 0)
+        chunkSize = Utils.bytesToIntLittleEndian(bytes, 4)
+        format = Utils.bytesToIntLittleEndian(bytes, 8)
+        subchunk1Id = Utils.bytesToIntLittleEndian(bytes, 12)
+        subchunk1Size = Utils.bytesToIntLittleEndian(bytes, 16)
+        audioFormat = Utils.bytesToShortLittleEndian(bytes, 20).toShort()
+        numChannels = Utils.bytesToShortLittleEndian(bytes, 22).toShort()
+        sampleRate = Utils.bytesToIntLittleEndian(bytes, 24)
+        byteRate = Utils.bytesToIntLittleEndian(bytes, 28)
+        blockAlign = Utils.bytesToShortLittleEndian(bytes, 32).toShort()
+        bitsPerSample = Utils.bytesToShortLittleEndian(bytes, 34).toShort()
+        subchunk2Id = Utils.bytesToIntLittleEndian(bytes, 36)
+        subchunk2Size = Utils.bytesToIntLittleEndian(bytes, 40)
 
-        bytesRead += 4
-        chunkId = charBuffToInt()
-
-        /* chunkSize */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        chunkSize = charBuffToInt()
-
-        /* format */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        format = charBuffToInt()
-
-        /* subchunk1Id */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        subchunk1Id = charBuffToInt()
-
-        /* subchunk1Size */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        subchunk1Size = charBuffToInt()
-
-        /* audioFormat & numChannels */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        charBuffToShots().also {(af, nc) ->
-            audioFormat = af
-            numChannels = nc
-        }
-
-        /* sampleRate */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        sampleRate = charBuffToInt()
-
-        /* byteRate */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        byteRate = charBuffToInt()
-
-        /* blockAlign & bitsPerSample */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        charBuffToShots().also { (ba, bps) ->
-            blockAlign = ba
-            bitsPerSample = bps
-        }
-
-        /* subchunk2Id */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        subchunk2Id = charBuffToInt()
-
-        /* subchunk2Size */
-        if(reader.read(charBuff) != 4)
-            return false
-
-        bytesRead += 4
-        subchunk2Size = charBuffToInt()
+        bytesRead = 44
 
         return true
     }
@@ -132,7 +64,7 @@ class WaveReader {
 
     fun isPCMFormat(): Boolean = subchunk1Size == 16 && audioFormat == 1.toShort()
 
-    fun readRaw8bit(buffer: CharArray): Int{
+    fun readRaw8bit(buffer: ByteArray): Int{
         if(bitsPerSample != 8.toShort())
             throw WrongDepthReading(8, bitsPerSample)
 
@@ -149,18 +81,15 @@ class WaveReader {
         var currentPos = 0
 
         do {
-            val toRead = Math.min(needBytes - currentBytes, rawCharBuff.size)
-            currentReadBytes = readRaw(rawCharBuff, toRead)
+            val toRead = min(needBytes - currentBytes, rawBytesBuff.size)
+            currentReadBytes = readRaw(rawBytesBuff, toRead)
             currentBytes += currentReadBytes
 
             for(i in 0 until currentReadBytes){
                 if(i % 2 == 0)
                     continue
 
-                val curr = rawCharBuff[i].toInt()
-                val prev = rawCharBuff[i - 1].toInt()
-
-                buffer[currentPos++] = ((curr shl 8) and prev).toShort()
+                buffer[currentPos++] = Utils.bytesToShortLittleEndian(rawBytesBuff, i - 1).toShort()
             }
 
         } while(currentBytes != needBytes && currentReadBytes != 0)
@@ -178,20 +107,15 @@ class WaveReader {
         var currentPos = 0
 
         do {
-            val toRead = Math.min(needBytes - currentBytes, rawCharBuff.size)
-            currentReadBytes = readRaw(rawCharBuff, toRead)
+            val toRead = min(needBytes - currentBytes, rawBytesBuff.size)
+            currentReadBytes = readRaw(rawBytesBuff, toRead)
             currentBytes += currentReadBytes
 
             for(i in 0 until currentReadBytes){
                 if(i % 4 == 3)
                     continue
 
-                val curr = rawCharBuff[i].toInt()
-                val prev1 = rawCharBuff[i - 1].toInt()
-                val prev2 = rawCharBuff[i - 2].toInt()
-                val prev3 = rawCharBuff[i - 3].toInt()
-
-                buffer[currentPos++] = (curr shl 24) and (prev1 shl 16) and (prev2 shl 8) and prev3
+                buffer[currentPos++] = Utils.bytesToIntLittleEndian(rawBytesBuff, i - 3)
             }
 
         } while(currentBytes != needBytes && currentReadBytes != 0)
@@ -199,38 +123,22 @@ class WaveReader {
         return currentBytes / 4
     }
 
-    fun readRaw(buffer: CharArray, length: Int): Int {
-        val reader = reader ?: throw unreadWaveHeaderException
+    fun readRaw(buffer: ByteArray, length: Int): Int {
+        val bytes = bytesBuff ?: throw unreadWaveHeaderException
         if(length > buffer.size)
             throw RuntimeException("Requested length ($length) is greater than buffer length (${buffer.size})")
 
-        val read = reader.read(buffer, bytesRead, Math.min(buffer.size, length))
-        bytesRead += read
-        return read
+        var toRead = min(buffer.size, length)
+        toRead = min(toRead, bytes.size - bytesRead)
+        bytes.copyInto(buffer, 0, bytesRead, bytesRead + toRead)
+        bytesRead += toRead
+        return toRead
     }
 
     fun close() {
+        isHeaderRead = false
+        bytesBuff = null
         bytesRead = 0
-        reader?.close()
-        reader = null
-    }
-
-    private fun charBuffToInt(): Int {
-        val a = charBuff[0].toInt()
-        val b = charBuff[1].toInt()
-        val c = charBuff[2].toInt()
-        val d = charBuff[3].toInt()
-
-        return (d shl 24) or (c shl 16) or (b shl 8) or a
-    }
-
-    private fun charBuffToShots(): Pair<Short, Short> {
-        val a = charBuff[0].toInt()
-        val b = charBuff[1].toInt()
-        val c = charBuff[2].toInt()
-        val d = charBuff[3].toInt()
-
-        return ((b shl 8) or a).toShort() to ((d shl 8) or c).toShort()
     }
 
     companion object {
