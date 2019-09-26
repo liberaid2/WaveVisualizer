@@ -1,6 +1,8 @@
 package com.liberaid.wavevisualizer
 
 import android.content.Context
+import java.io.File
+import java.io.FileNotFoundException
 import kotlin.math.min
 
 class WaveReader {
@@ -31,9 +33,23 @@ class WaveReader {
     fun readWaveHeaderFromAssets(context: Context, filename: String) {
         close()
 
-        bytesBuff = context.assets.open(filename).readBytes()
+        try {
+            bytesBuff = context.assets.open(filename).readBytes()
+            isHeaderRead = readHeader()
+        } catch (e: Exception) {
+            throw FileNotFoundException("Cannot load file $filename from assets, error message: ${e.message}")
+        }
+    }
 
-        isHeaderRead = readHeader()
+    fun readWaveHeaderFromFile(filename: String) {
+        close()
+
+        try {
+            bytesBuff = File(filename).readBytes()
+            isHeaderRead = readHeader()
+        } catch (e: Exception) {
+            throw FileNotFoundException("Cannot load file $filename, error message: ${e.message}")
+        }
     }
 
     private fun readHeader(): Boolean {
