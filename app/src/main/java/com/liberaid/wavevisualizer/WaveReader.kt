@@ -41,13 +41,11 @@ class WaveReader {
         }
     }
 
-    fun readWaveHeaderFromFile(filename: String) {
-        close()
-
-        readWaveHeaderFromFile(File(filename))
-    }
+    fun readWaveHeaderFromFile(filename: String) = readWaveHeaderFromFile(File(filename))
 
     fun readWaveHeaderFromFile(file: File) {
+        close()
+
         try {
             bytesBuff = file.readBytes()
             isHeaderRead = readHeader()
