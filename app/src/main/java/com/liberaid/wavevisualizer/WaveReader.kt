@@ -44,11 +44,15 @@ class WaveReader {
     fun readWaveHeaderFromFile(filename: String) {
         close()
 
+        readWaveHeaderFromFile(File(filename))
+    }
+
+    fun readWaveHeaderFromFile(file: File) {
         try {
-            bytesBuff = File(filename).readBytes()
+            bytesBuff = file.readBytes()
             isHeaderRead = readHeader()
         } catch (e: Exception) {
-            throw FileNotFoundException("Cannot load file $filename, error message: ${e.message}")
+            throw FileNotFoundException("Cannot load file ${file.name}, error message: ${e.message}")
         }
     }
 
