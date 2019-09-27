@@ -5,8 +5,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.os.Environment
 import android.util.AttributeSet
 import android.view.View
+import java.io.File
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -85,9 +87,22 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         }
     }
 
+    fun loadWaveFromFile(file: File): Boolean {
+        waveReader.readWaveHeaderFromFile(file)
+        return handleWave()
+    }
+
+    fun loadWaveFromFile(filename: String): Boolean {
+        waveReader.readWaveHeaderFromFile(filename)
+        return handleWave()
+    }
+
     fun loadWaveFromAssets(filename: String): Boolean {
         waveReader.readWaveHeaderFromAssets(context, filename)
+        return handleWave()
+    }
 
+    private fun handleWave(): Boolean {
         if(!waveReader.isHeaderRead || !waveReader.isHeaderValid() || !waveReader.isPCMFormat())
             return false
 
