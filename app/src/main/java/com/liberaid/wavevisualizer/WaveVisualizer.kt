@@ -1,5 +1,6 @@
 package com.liberaid.wavevisualizer
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -8,6 +9,8 @@ import android.graphics.RectF
 import android.os.Environment
 import android.util.AttributeSet
 import android.view.View
+import android.view.animation.DecelerateInterpolator
+import androidx.core.animation.addListener
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.min
@@ -22,6 +25,8 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
     private val paint = Paint()
     private val barRect = RectF()
 
+    private var sizeScale = 0f
+
     init {
         context.theme.obtainStyledAttributes(attrs, R.styleable.WaveVisualizer, 0, 0).apply {
             try {
@@ -31,6 +36,7 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
                 barsColor = getColor(R.styleable.WaveVisualizer_barsColor, DEFAULT_BARS_COLOR)
                 barWidth = getDimension(R.styleable.WaveVisualizer_barWidth, 16f)
                 barsOffset = getDimension(R.styleable.WaveVisualizer_barsOffset, 8f)
+                animationDuration = getInteger(R.styleable.WaveVisualizer_animationDuration, DEFAULT_ANIMATION_DURATION)
             } finally {
                 recycle()
             }
@@ -76,7 +82,7 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         var frac: Float
 
         amplitudes.forEach{
-            frac = it / maxAmp
+            frac = it / maxAmp * sizeScale
             y = borderRect.height() / 2 - frac * borderRect.height()
             h = borderRect.height() / 2 + frac * borderRect.height()
 
@@ -107,6 +113,7 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
             return false
 
         amplitudes.clear()
+        sizeScale = 0f
 
         /* Hardcoded for 2 channels */
         val barsNumber = (borderRect.width() / (barWidth + barsOffset)).toInt()
@@ -119,6 +126,18 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
             amplitudes.add(abs(average.toInt()))
 
             readSamples = (waveReader.bytesRead - WaveReader.HEADER_SIZE) / ( waveReader.bitsPerSample / 8 )
+        }
+
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = animationDuration.toLong()
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                sizeScale = it.animatedFraction
+                invalidate()
+            }
+
+            addListener(onEnd = { invalidate() })
+            start()
         }
 
         return true
@@ -160,10 +179,20 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         invalidate()
     }
 
+    var animationDuration = DEFAULT_ANIMATION_DURATION
+    set(value) {
+        if(value > 0)
+            field = value
+
+        invalidate()
+    }
+
     companion object {
         const val DEFAULT_BORDER_COLOR = Color.TRANSPARENT
         const val DEFAULT_DELIMITER_COLOR = Color.DKGRAY
         const val DEFAULT_BARS_COLOR = Color.GRAY
         val DEFAULT_BG_COLOR = Color.parseColor("#77ed4c")
+
+        const val DEFAULT_ANIMATION_DURATION = 200
     }
 }
