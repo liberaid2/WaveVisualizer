@@ -33,6 +33,14 @@ class WaveReader {
     val duration: Long
         get() = waveSamples * 1000L / sampleRate / numChannels
 
+    /**
+     * Reads wave header from assets
+     *
+     * @param context - android application context
+     * @param filename - wave filename in assets folder
+     *
+     * @throws FileNotFoundException if there is no such file in assets
+     * */
     fun readWaveHeaderFromAssets(context: Context, filename: String) {
         close()
 
@@ -44,8 +52,22 @@ class WaveReader {
         }
     }
 
+    /**
+     * Reads wave header from storage
+     *
+     * @param filename - name of wave file to be read
+     *
+     * @throws FileNotFoundException if there is no such file or it's not permitted to read the file
+     * */
     fun readWaveHeaderFromFile(filename: String) = readWaveHeaderFromFile(File(filename))
 
+    /**
+     * Reads wave file from storage
+     *
+     * @param file - java [File] to read
+     *
+     * @throws FileNotFoundException if there is no such file or it's not permitted to read the file
+     * */
     fun readWaveHeaderFromFile(file: File) {
         close()
 
@@ -79,6 +101,12 @@ class WaveReader {
         return true
     }
 
+    /**
+     * Checks if file header is valid for the rest operations
+     * Valid means it's a WAV file with PCM encoding
+     *
+     * @return true if header is valid, false otherwise
+     * */
     fun isHeaderValid(): Boolean {
         if(!isHeaderRead)
             throw unreadWaveHeaderException
@@ -91,6 +119,15 @@ class WaveReader {
      * */
     fun isPCMFormat(): Boolean = subchunk1Size == 16 && audioFormat == 1.toShort()
 
+    /**
+     * Reads raw values considers 8bit depth
+     * The size of read values if max of buffer's size and rest samples
+     *
+     * @param buffer - a buffer to read bytes to
+     *
+     * @return bytes read
+     * @throws WrongDepthReading if the depth of file isn't 8bit
+     * */
     fun readRaw8bit(buffer: ByteArray): Int{
         if(bitsPerSample != 8.toShort())
             throw WrongDepthReading(8, bitsPerSample)
@@ -98,6 +135,15 @@ class WaveReader {
         return readRaw(buffer, buffer.size)
     }
 
+    /**
+     * Reads raw values considers 16bit depth
+     * The size of read values if max of buffer's size and rest samples
+     *
+     * @param buffer - a buffer to read bytes to
+     *
+     * @return bytes read
+     * @throws WrongDepthReading if the depth of file isn't 16bit
+     * */
     fun readRaw16bit(buffer: ShortArray): Int {
         if(bitsPerSample != 16.toShort())
             throw WrongDepthReading(16, bitsPerSample)
@@ -124,6 +170,15 @@ class WaveReader {
         return currentBytes / 2
     }
 
+    /**
+     * Reads raw values considers 32bit depth
+     * The size of read values if max of buffer's size and rest samples
+     *
+     * @param buffer - a buffer to read bytes to
+     *
+     * @return bytes read
+     * @throws WrongDepthReading if the depth of file isn't 32bit
+     * */
     fun readRaw32bit(buffer: IntArray): Int {
         if(bitsPerSample != 32.toShort())
             throw WrongDepthReading(32, bitsPerSample)
@@ -150,6 +205,17 @@ class WaveReader {
         return currentBytes / 4
     }
 
+    /**
+     * Reads raw values independent of depth
+     *
+     * @param buffer - a buffer to read bytes to
+     * @param length - desired number of bytes to read
+     *
+     * @return bytes read
+     *
+     * @throws UnreadWaveHeaderException if wave file is not opened and parsed
+     * @throws IndexOutOfBoundsException if requested length is more than rest bytes
+     * */
     fun readRaw(buffer: ByteArray, length: Int): Int {
         val bytes = bytesBuff ?: throw unreadWaveHeaderException
         if(length > buffer.size)
@@ -166,7 +232,10 @@ class WaveReader {
      * Calculates average value for each channel by all [samples]
      *
      * @param samples - number of samples to read
+     *
      * @return average values for each channel
+     *
+     * @throws UnreadWaveHeaderException if wave file is not opened and parsed
      * */
     fun readAverage(samples: Int): DoubleArray {
         val bytes = bytesBuff ?: throw unreadWaveHeaderException
@@ -205,6 +274,9 @@ class WaveReader {
         return result
     }
 
+    /**
+     * Clears internal information about opened wave file
+     * */
     fun close() {
         isHeaderRead = false
         bytesBuff = null

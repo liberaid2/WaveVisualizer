@@ -101,6 +101,13 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         }
     }
 
+    /**
+     * Animates playing progress
+     * Load wave file before using this function
+     * See [loadWaveFromFile], [loadWaveFromAssets]
+     *
+     * @throws IllegalStateException if wave file is not loaded
+     * */
     fun animatePlayingProgress() {
         if(!waveReader.isHeaderRead || !waveReader.isHeaderValid() || !waveReader.isPCMFormat())
             throw IllegalStateException("Wave file is not read or header/format is not valid")
@@ -117,16 +124,44 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         }
     }
 
+    /**
+     * Stops playing animation
+     * */
+    fun stopAnimation() {
+        playingAnimator?.cancel()
+        playingAnimator = null
+
+        playingProgress = 0f
+    }
+
+    /**
+     * Loads wave file using java [File]
+     *
+     * @param file - wave file to be opened
+     * @returns true on success, false on error or invalid header format or invalid encoding (non-linear)
+     * */
     fun loadWaveFromFile(file: File): Boolean {
         waveReader.readWaveHeaderFromFile(file)
         return handleWave()
     }
 
+    /**
+     * Loads wave file via filename
+     *
+     * @param filename - wave file to be opened
+     * @returns true on success, false on error or invalid header format or invalid encoding (non-linear)
+     * */
     fun loadWaveFromFile(filename: String): Boolean {
         waveReader.readWaveHeaderFromFile(filename)
         return handleWave()
     }
 
+    /**
+     * Loads wave file from assets
+     *
+     * @param filename - wave file to be opened
+     * @return true on success, false on error or invalid header format or invalid encoding (non-linear)
+     * */
     fun loadWaveFromAssets(filename: String): Boolean {
         waveReader.readWaveHeaderFromAssets(context, filename)
         return handleWave()
