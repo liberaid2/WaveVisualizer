@@ -6,10 +6,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
-import android.os.Environment
 import android.util.AttributeSet
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import androidx.core.animation.addListener
 import java.io.File
 import kotlin.math.abs
@@ -26,6 +26,10 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
     private val barRect = RectF()
 
     private var sizeScale = 0f
+    private var playingProgress = 0f
+
+    private var scalingAnimator: ValueAnimator? = null
+    private var playingAnimator: ValueAnimator? = null
 
     init {
         context.theme.obtainStyledAttributes(attrs, R.styleable.WaveVisualizer, 0, 0).apply {
@@ -34,6 +38,7 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
                 bgColor = getColor(R.styleable.WaveVisualizer_bgColor, DEFAULT_BG_COLOR)
                 delimiterColor = getColor(R.styleable.WaveVisualizer_delimiterColor, DEFAULT_DELIMITER_COLOR)
                 barsColor = getColor(R.styleable.WaveVisualizer_barsColor, DEFAULT_BARS_COLOR)
+                barsPlayedColor = getColor(R.styleable.WaveVisualizer_barsPlayedColor, DEFAULT_BARS_PLAYED_COLOR)
                 barWidth = getDimension(R.styleable.WaveVisualizer_barWidth, 16f)
                 barsOffset = getDimension(R.styleable.WaveVisualizer_barsOffset, 8f)
                 animationDuration = getInteger(R.styleable.WaveVisualizer_animationDuration, DEFAULT_ANIMATION_DURATION)
@@ -72,7 +77,7 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
 
         paint.apply {
             style = Paint.Style.FILL
-            color = barsColor
+            color = barsPlayedColor
         }
 
         var x = barsOffset / 2f
@@ -82,6 +87,9 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         var frac: Float
 
         amplitudes.forEach{
+            if(x > borderRect.width() * playingProgress)
+                paint.color = barsColor
+
             frac = it / maxAmp * sizeScale
             y = borderRect.height() / 2 - frac * borderRect.height()
             h = borderRect.height() / 2 + frac * borderRect.height()
@@ -90,6 +98,22 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
             canvas.drawRect(barRect, paint)
 
             x += barWidth + barsOffset
+        }
+    }
+
+    fun animatePlayingProgress() {
+        if(!waveReader.isHeaderRead || !waveReader.isHeaderValid() || !waveReader.isPCMFormat())
+            throw IllegalStateException("Wave file is not read or header/format is not valid")
+
+        playingAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = waveReader.duration
+            interpolator = LinearInterpolator()
+            addUpdateListener {
+                playingProgress = it.animatedFraction
+                invalidate()
+            }
+
+            start()
         }
     }
 
@@ -114,6 +138,7 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
 
         amplitudes.clear()
         sizeScale = 0f
+        playingProgress = 0f
 
         /* Hardcoded for 2 channels */
         val barsNumber = (borderRect.width() / (barWidth + barsOffset)).toInt()
@@ -128,7 +153,7 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
             readSamples = (waveReader.bytesRead - WaveReader.HEADER_SIZE) / ( waveReader.bitsPerSample / 8 )
         }
 
-        ValueAnimator.ofFloat(0f, 1f).apply {
+        scalingAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = animationDuration.toLong()
             interpolator = DecelerateInterpolator()
             addUpdateListener {
@@ -141,6 +166,16 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         }
 
         return true
+    }
+
+    override fun onDetachedFromWindow() {
+        scalingAnimator?.cancel()
+        scalingAnimator = null
+
+        playingAnimator?.cancel()
+        playingAnimator = null
+
+        super.onDetachedFromWindow()
     }
 
     var borderColor: Int = 0
@@ -162,6 +197,12 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
     }
 
     var barsColor: Int = 0
+    set(value) {
+        field = value
+        invalidate()
+    }
+
+    var barsPlayedColor: Int = 0
     set(value) {
         field = value
         invalidate()
@@ -191,6 +232,7 @@ class WaveVisualizer(context: Context, attrs: AttributeSet) : View(context, attr
         const val DEFAULT_BORDER_COLOR = Color.TRANSPARENT
         const val DEFAULT_DELIMITER_COLOR = Color.DKGRAY
         const val DEFAULT_BARS_COLOR = Color.GRAY
+        const val DEFAULT_BARS_PLAYED_COLOR = Color.RED
         val DEFAULT_BG_COLOR = Color.parseColor("#77ed4c")
 
         const val DEFAULT_ANIMATION_DURATION = 200

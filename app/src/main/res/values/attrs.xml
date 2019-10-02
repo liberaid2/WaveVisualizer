@@ -5,6 +5,7 @@
         <attr name="bgColor" format="color"/>
         <attr name="delimiterColor" format="color"/>
         <attr name="barsColor" format="color"/>
+        <attr name="barsPlayedColor" format="color"/>
         <attr name="barWidth" format="dimension"/>
         <attr name="barsOffset" format="dimension"/>
         <attr name="animationDuration" format="integer"/>

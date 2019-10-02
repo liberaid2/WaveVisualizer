@@ -30,6 +30,9 @@ class WaveReader {
     val waveSamples: Int
         get() = subchunk2Size / (bitsPerSample / 8)
 
+    val duration: Long
+        get() = waveSamples * 1000L / sampleRate / numChannels
+
     fun readWaveHeaderFromAssets(context: Context, filename: String) {
         close()
 
